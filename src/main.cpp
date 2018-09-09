@@ -34,47 +34,139 @@ int main()
 
   PID pid;
   // TODO: Initialize the pid variable.
+/*
+  for(int i = 0; i < 3; i ++)
+  {
+     pid.p[i] = 0.0;
+     pid.dp[i] = 1.0;
+  }
+    
+  pid.counter = 0;
+  pid.acc_err = 0;
+  pid.bDecreseFlag = 0;
+  pid.bFirstStep = 0;
+  pid.i = 0;
+ 
+
+  pid.Init(pid.p[0],pid.p[1],pid.p[2]);
+*/
+    
+  //pid.Init(0.2,0.0004,2.0);
+  pid.Init(0.1,0.00001,1.8);
 
   h.onMessage([&pid](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
-    if (length && length > 2 && data[0] == '4' && data[1] == '2')
-    {
-      auto s = hasData(std::string(data).substr(0, length));
-      if (s != "") {
-        auto j = json::parse(s);
-        std::string event = j[0].get<std::string>();
-        if (event == "telemetry") {
-          // j[1] is the data JSON object
-          double cte = std::stod(j[1]["cte"].get<std::string>());
-          double speed = std::stod(j[1]["speed"].get<std::string>());
-          double angle = std::stod(j[1]["steering_angle"].get<std::string>());
-          double steer_value;
-          /*
-          * TODO: Calcuate steering value here, remember the steering value is
-          * [-1, 1].
-          * NOTE: Feel free to play around with the throttle and speed. Maybe use
-          * another PID controller to control the speed!
-          */
-          
-          // DEBUG
-          std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
+      /* more than one circle */
+            if (length && length > 2 && data[0] == '4' && data[1] == '2')
+            {
+              auto s = hasData(std::string(data).substr(0, length));
+              if (s != "") {
+                auto j = json::parse(s);
+                std::string event = j[0].get<std::string>();
+                if (event == "telemetry") {
+                  // j[1] is the data JSON object
+                  double cte = std::stod(j[1]["cte"].get<std::string>());
+                  double speed = std::stod(j[1]["speed"].get<std::string>());
+                  double angle = std::stod(j[1]["steering_angle"].get<std::string>());
+                  double steer_value;
+                  /*
+                  * TODO: Calcuate steering value here, remember the steering value is
+                  * [-1, 1].
+                  * NOTE: Feel free to play around with the throttle and speed. Maybe use
+                  * another PID controller to control the speed!
+                  */
 
-          json msgJson;
-          msgJson["steering_angle"] = steer_value;
-          msgJson["throttle"] = 0.3;
-          auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
-          ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+//                    /* reset position */
+//                    if(pid.counter > 200 )//|| pid.acc_err > 1000)
+//                    {
+//                        /* equal while */
+//                        if((pid.dp[0] + pid.dp[1] + pid.dp[2]) < 0.2)
+//                        {
+//                            std::cout << "P : "<< pid.p[0] << ", I: " << pid.p[1] << ", D : " << pid.p[2] << std::endl;
+//                            while(1);
+//                        }
+//
+//                        /* Init best error, only executed once */
+//                        if(0 == pid.bFirstStep)
+//                        {
+//                            pid.best_err = pid.acc_err;
+//                            pid.bFirstStep = 1;
+//                            pid.i = 0;
+//                            pid.p[pid.i] += pid.dp[pid.i];
+//                        } else if(1 == pid.bDecreseFlag)
+//                        {
+//                            if(pid.acc_err < pid.best_err)
+//                            {
+//                                pid.best_err = pid.acc_err;
+//                                pid.dp[pid.i] *= 1.1;
+//                            } else
+//                            {
+//                                pid.p[pid.i] += pid.dp[pid.i];
+//                                pid.dp[pid.i] *= 0.9;
+//                            }
+//                            pid.i = (pid.i + 1) % 3;
+//                            pid.p[pid.i] += pid.dp[pid.i];
+//                            pid.bDecreseFlag = 0;
+//                        }
+//                        else
+//                        {
+//                            if(pid.acc_err < pid.best_err)
+//                            {
+//                                pid.best_err = pid.acc_err;
+//                                pid.dp[pid.i] *= 1.1;
+//                                /* iterate i */
+//                                pid.i = (pid.i + 1) % 3;
+//                                pid.p[pid.i] += pid.dp[pid.i];
+//                            } else
+//                            {
+//                                pid.p[pid.i] -= 2 * pid.dp[pid.i];
+//                                pid.bDecreseFlag = 1;
+//                                /* DO NOT iterat i */
+//                            }
+//                        }
+//
+//                        pid.counter = 0;
+//                        pid.acc_err = 0.0;
+//
+//                        pid.Init(pid.p[0],pid.p[1],pid.p[2]);
+//
+//                        std::string msg = "42[\"reset\",{}]";
+//                        ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+//                    }
+//                    std::cout << "P : "<< pid.p[0] << ", I: " << pid.p[1] << ", D : " << pid.p[2] << std::endl;
+//
+//                    std::cout << "dp[0] : "<< pid.dp[0] << ",dp[1] : " << pid.dp[1] << ",dp[2] : " << pid.dp[2] << std::endl;
+
+                  pid.UpdateError(cte);
+                  steer_value = pid.TotalError();
+                    
+                  pid.acc_err += cte * cte;
+                  pid.counter += 1;
+                  std::cout << "counter is : " << pid.counter << std::endl;
+                  std::cout << "acculate err is : " << pid.acc_err << std::endl;
+                  
+                  // DEBUG
+                  std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
+
+                  json msgJson;
+                  msgJson["steering_angle"] = steer_value;
+                  msgJson["throttle"] = 0.3;
+                  auto msg = "42[\"steer\"," + msgJson.dump() + "]";
+                  std::cout << msg << std::endl;
+                  ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+                }
+              } else {
+                // Manual driving
+                std::string msg = "42[\"manual\",{}]";
+                ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+              }
         }
-      } else {
-        // Manual driving
-        std::string msg = "42[\"manual\",{}]";
-        ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
-      }
-    }
+
   });
+
 
   // We don't need this since we're not using HTTP but if it's removed the program
   // doesn't compile :-(

@@ -16,6 +16,16 @@ public:
   double Kp;
   double Ki;
   double Kd;
+    
+  /* for twiddle */
+  double dp[3];
+  double p[3];
+  unsigned long counter;
+  double acc_err;
+  double best_err;
+  int i;
+  bool bDecreseFlag;
+  bool bFirstStep;
 
   /*
   * Constructor
