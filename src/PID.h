@@ -16,6 +16,9 @@ public:
   double Kp;
   double Ki;
   double Kd;
+  double best_Kp;
+  double best_Ki;
+  double best_Kd;
     
   /* for twiddle */
   double dp[3];

@@ -7,6 +7,9 @@
 // for convenience
 using json = nlohmann::json;
 
+//#define _TWIDDLE_
+#define COUNTER_THRESHOLD (1200u)
+
 // For converting back and forth between radians and degrees.
 constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
@@ -34,7 +37,7 @@ int main()
 
   PID pid;
   // TODO: Initialize the pid variable.
-/*
+
   for(int i = 0; i < 3; i ++)
   {
      pid.p[i] = 0.0;
@@ -46,14 +49,19 @@ int main()
   pid.bDecreseFlag = 0;
   pid.bFirstStep = 0;
   pid.i = 0;
- 
+  pid.best_Kp = 0;
+  pid.best_Ki = 0;
+  pid.best_Kd = 0;
 
   pid.Init(pid.p[0],pid.p[1],pid.p[2]);
-*/
     
   //pid.Init(0.2,0.0004,2.0);
-  pid.Init(0.1,0.00001,1.8);
-
+  //pid.Init(0.1,0.00001,1.8);
+    
+#ifndef _TWIDDLE_
+   pid.Init(0.08, 0.00001, 1.84);
+#endif
+    
   h.onMessage([&pid](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
 
     // "42" at the start of the message means there's a websocket message event.
@@ -78,75 +86,103 @@ int main()
                   * NOTE: Feel free to play around with the throttle and speed. Maybe use
                   * another PID controller to control the speed!
                   */
+#ifdef _TWIDDLE_
+                    /* reset position */
+                    if(pid.counter > COUNTER_THRESHOLD )//|| pid.acc_err > 1000)
+                    {
+                        /* equal while */
+                        if((pid.dp[0] + pid.dp[1] + pid.dp[2]) < 0.01)
+                        {
+                            std::cout << "The final parameters are : " << std::endl;
+                            std::cout << "P : "<< pid.best_Kp << ", I: " << pid.best_Ki << ", D : " << pid.best_Kd << std::endl;
+                            while(1);
+                        }
 
-//                    /* reset position */
-//                    if(pid.counter > 200 )//|| pid.acc_err > 1000)
-//                    {
-//                        /* equal while */
-//                        if((pid.dp[0] + pid.dp[1] + pid.dp[2]) < 0.2)
-//                        {
-//                            std::cout << "P : "<< pid.p[0] << ", I: " << pid.p[1] << ", D : " << pid.p[2] << std::endl;
-//                            while(1);
-//                        }
-//
-//                        /* Init best error, only executed once */
-//                        if(0 == pid.bFirstStep)
-//                        {
-//                            pid.best_err = pid.acc_err;
-//                            pid.bFirstStep = 1;
-//                            pid.i = 0;
-//                            pid.p[pid.i] += pid.dp[pid.i];
-//                        } else if(1 == pid.bDecreseFlag)
-//                        {
-//                            if(pid.acc_err < pid.best_err)
-//                            {
-//                                pid.best_err = pid.acc_err;
-//                                pid.dp[pid.i] *= 1.1;
-//                            } else
-//                            {
-//                                pid.p[pid.i] += pid.dp[pid.i];
-//                                pid.dp[pid.i] *= 0.9;
-//                            }
-//                            pid.i = (pid.i + 1) % 3;
-//                            pid.p[pid.i] += pid.dp[pid.i];
-//                            pid.bDecreseFlag = 0;
-//                        }
-//                        else
-//                        {
-//                            if(pid.acc_err < pid.best_err)
-//                            {
-//                                pid.best_err = pid.acc_err;
-//                                pid.dp[pid.i] *= 1.1;
-//                                /* iterate i */
-//                                pid.i = (pid.i + 1) % 3;
-//                                pid.p[pid.i] += pid.dp[pid.i];
-//                            } else
-//                            {
-//                                pid.p[pid.i] -= 2 * pid.dp[pid.i];
-//                                pid.bDecreseFlag = 1;
-//                                /* DO NOT iterat i */
-//                            }
-//                        }
-//
-//                        pid.counter = 0;
-//                        pid.acc_err = 0.0;
-//
-//                        pid.Init(pid.p[0],pid.p[1],pid.p[2]);
-//
-//                        std::string msg = "42[\"reset\",{}]";
-//                        ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
-//                    }
-//                    std::cout << "P : "<< pid.p[0] << ", I: " << pid.p[1] << ", D : " << pid.p[2] << std::endl;
-//
-//                    std::cout << "dp[0] : "<< pid.dp[0] << ",dp[1] : " << pid.dp[1] << ",dp[2] : " << pid.dp[2] << std::endl;
+                        /* Init best error, only executed once */
+                        if(0 == pid.bFirstStep)
+                        {
+                            pid.best_err = pid.acc_err;
+                            pid.bFirstStep = 1;
+                            pid.i = 0;
+                            pid.p[pid.i] += pid.dp[pid.i];
+                        } else if(1 == pid.bDecreseFlag)
+                        {
+                            if(pid.acc_err < pid.best_err)
+                            {
+                                pid.best_err = pid.acc_err;
+                                pid.dp[pid.i] *= 1.05;
+                                pid.best_Kp = pid.p[0];
+                                pid.best_Ki = pid.p[1];
+                                pid.best_Kd = pid.p[2];
+                            } else
+                            {
+                                pid.p[pid.i] += pid.dp[pid.i];
+                                pid.dp[pid.i] *= 0.95;
+                            }
+                            pid.i = (pid.i + 1) % 3;
+                            pid.p[pid.i] += pid.dp[pid.i];
+                            pid.bDecreseFlag = 0;
+                        }
+                        else
+                        {
+                            if(pid.acc_err < pid.best_err)
+                            {
+                                pid.best_err = pid.acc_err;
+                                pid.dp[pid.i] *= 1.1;
+                                pid.best_Kp = pid.p[0];
+                                pid.best_Ki = pid.p[1];
+                                pid.best_Kd = pid.p[2];
+                                /* iterate i */
+                                pid.i = (pid.i + 1) % 3;
+                                pid.p[pid.i] += pid.dp[pid.i];
+                            } else
+                            {
+                                pid.p[pid.i] -= 2.0 * pid.dp[pid.i];
+                                pid.bDecreseFlag = 1;
+                                /* DO NOT iterat i */
+                            }
+                        }
 
+                        pid.counter = 0;
+                        pid.acc_err = 0.0;
+
+                        pid.Init(pid.p[0],pid.p[1],pid.p[2]);
+
+                        std::string msg = "42[\"reset\",{}]";
+                        ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+                    }
+#endif
+                    std::cout << "P : "<< pid.p[0] << ", I: " << pid.p[1] << ", D : " << pid.p[2] << std::endl;
+                    std::cout << "dp[0] : "<< pid.dp[0] << ",dp[1] : " << pid.dp[1] << ",dp[2] : " << pid.dp[2] << std::endl;
+
+                    pid.acc_err += cte * cte;
+                    std::cout << "Speed is :" << speed << std::endl;
+#ifdef _TWIDDLE_
+                    /* If the car stop, add a large error */
+                    if((speed < 1))
+                    {
+                        if (pid.counter > 300)
+                        {
+                            pid.acc_err += 100;
+                        }
+                    }
+                    
+                    /* stop this try if it has exceed the best error much */
+                    if( (1 == pid.bFirstStep) && (pid.acc_err > pid.best_err))
+                    {
+                        pid.counter = COUNTER_THRESHOLD;
+                    }
+#endif
+                    pid.counter += 1;
+                    
                   pid.UpdateError(cte);
                   steer_value = pid.TotalError();
-                    
-                  pid.acc_err += cte * cte;
-                  pid.counter += 1;
+                   
+                  std::cout << "the index of i is :" << pid.i << std::endl;
                   std::cout << "counter is : " << pid.counter << std::endl;
                   std::cout << "acculate err is : " << pid.acc_err << std::endl;
+                  std::cout << "best error is : " << pid.best_err << std::endl;
+                  std::cout << "best Kp is : " << pid.best_Kp << ", best Ki is : " << pid.best_Ki << ", best Kd is : " << pid.best_Kd << std::endl;
                   
                   // DEBUG
                   std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
